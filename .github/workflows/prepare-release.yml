@@ -1,0 +1,129 @@
+name: Prepare Release PR
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semver (e.g. 1.2.3 or 1.2.3-beta.1; do NOT prefix with v)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base is latest main
+        run: |
+          git fetch origin main --prune --tags
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Validate input is SemVer (no leading v, strict regex)
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # 1) No leading 'v'
+          if [[ "$VERSION" =~ ^v ]]; then
+            echo "❌ Input must NOT start with 'v'. Use e.g. 1.2.3"
+            exit 1
+          fi
+
+          # 2) Strict SemVer regex (prerelease & build metadata supported)
+          SEMVER_RGX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-((?:0|[1-9A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+          if [[ ! "$VERSION" =~ $SEMVER_RGX ]]; then
+            echo "❌ '$VERSION' is not valid SemVer"
+            exit 1
+          fi
+
+      - name: Guard against duplicate tag and branch
+        run: |
+          VERSION="${{ inputs.version }}"
+          git fetch --tags --force
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag v$VERSION already exists"
+            exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "release/v$VERSION" >/dev/null 2>&1; then
+            echo "❌ Branch release/v$VERSION already exists"
+            exit 1
+          fi
+
+      - name: Verify package.json exists and read current version
+        shell: bash
+        run: |
+          test -f package.json || { echo "❌ package.json not found"; exit 1; }
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "Current package.json version: $CURRENT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Enforce monotonic version (next > current) using semver
+        shell: bash
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          NEXT="${{ inputs.version }}"
+          # Use npx without modifying repo
+          npx -y semver@7 -r ">$CURRENT" "$NEXT" >/dev/null || {
+            echo "❌ Input version ($NEXT) must be greater than current ($CURRENT)"
+            exit 1
+          }
+
+      - name: Bump package.json (no tag), lock file if present
+        run: |
+          npm version "${{ inputs.version }}" --no-git-tag-version
+          # If you keep a lockfile, update it reproducibly; ignore if none
+          [ -f package-lock.json ] && npm ci || true
+
+      - name: Verify bump took effect and matches input
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          NEW=$(node -p "require('./package.json').version")
+          if [ "$NEW" != "$VERSION" ]; then
+            echo "❌ package.json version ($NEW) != input ($VERSION)"
+            exit 1
+          fi
+          # Ensure something actually changed (package.json at minimum)
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "❌ No changes after bump; aborting"
+            exit 1
+          fi
+
+      - name: Create release branch & commit
+        run: |
+          VERSION="${{ inputs.version }}"
+          git switch -c "release/v$VERSION"
+          git add package.json package-lock.json 2>/dev/null || true
+          git commit -m "chore(release): v$VERSION"
+          git push -u origin HEAD
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: release/v${{ inputs.version }}
+          title: 'chore(release): v${{ inputs.version }}'
+          body: |
+            This PR prepares **v${{ inputs.version }}**.
+
+            Checks applied:
+            - Strict SemVer validation (no leading 'v')
+            - Ensured tag and release branch don't already exist
+            - Enforced version monotonicity (greater than current)
+            - Bumped package.json and verified it matches input
+          base: main
+          draft: false
+          labels: release
