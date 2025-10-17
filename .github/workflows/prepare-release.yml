@@ -1,0 +1,151 @@
+name: Prepare Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description:
+          'SemVer to release (e.g. 1.2.3 or 1.2.3-beta.1; do NOT prefix with v)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base is latest main
+        shell: bash
+        run: |
+          git fetch origin main --prune --tags
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Install Node (for validation scripts)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install semver (ephemeral)
+        shell: bash
+        run: |
+          npm install semver@7 \
+            --no-save \
+            --no-audit \
+            --no-fund \
+            --prefer-offline \
+            --package-lock=false
+
+      - name: Validate input version (SemVer; no leading v)
+        shell: bash
+        run: |
+          VERSION="$(printf '%s' "${{ inputs.version }}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+          # Disallow leading 'v'
+          if [[ "$VERSION" =~ ^v ]]; then
+            echo "::error ::Input must NOT start with 'v' (use e.g. 1.2.3)"
+            exit 1
+          fi
+
+          # Validate using semver
+          node -e 'const s=require("semver");const v=process.argv[1];if(!s.valid(v)){console.error("::error ::"+v+" is not valid SemVer");process.exit(1)}' "$VERSION"
+
+      - name: Guard against duplicate tag/branch
+        shell: bash
+        run: |
+          VERSION="$(printf '%s' "${{ inputs.version }}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          git fetch --tags --force
+
+          # Tag collision
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error ::Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          # Remote branch collision
+          if git ls-remote --exit-code --heads origin "release/v$VERSION" >/dev/null 2>&1; then
+            echo "::error ::Branch release/v$VERSION already exists on origin"
+            exit 1
+          fi
+
+      - name: Verify package.json exists and read current version
+        shell: bash
+        run: |
+          test -f package.json || { echo "::error ::package.json not found"; exit 1; }
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "Current package.json version: $CURRENT"
+
+      - name: Enforce monotonic version (next > current)
+        shell: bash
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          NEXT="$(printf '%s' "${{ inputs.version }}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+          node -e '
+            const s=require("semver");
+            const current=process.argv[1], next=process.argv[2];
+            if(!s.valid(current)){ console.error("::error ::package.json has invalid semver: "+current); process.exit(1) }
+            if(!s.valid(next))   { console.error("::error ::Input is invalid semver: "+next); process.exit(1) }
+            if(!s.gt(next, current)){ console.error("::error ::Input ("+next+") must be greater than current ("+current+")"); process.exit(1) }
+          ' "$CURRENT" "$NEXT"
+
+      - name: Bump package.json (no Git tag)
+        shell: bash
+        run: |
+          VERSION="$(printf '%s' "${{ inputs.version }}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          npm version "$VERSION" --no-git-tag-version
+          # If you keep a lockfile, this will update it; ignore if none exists
+          if [ -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
+
+      - name: Verify bump took effect
+        shell: bash
+        run: |
+          VERSION="$(printf '%s' "${{ inputs.version }}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          NEW=$(node -p "require('./package.json').version")
+          if [ "$NEW" != "$VERSION" ]; then
+            echo "::error ::package.json version ($NEW) != input ($VERSION)"
+            exit 1
+          fi
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::error ::No changes after bump; aborting"
+            exit 1
+          fi
+
+      - name: Create PR with human author/committer
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: release/v${{ inputs.version }}
+          base: main
+          title: 'chore(release): v${{ inputs.version }}'
+          commit-message: 'chore(release): v${{ inputs.version }}'
+          author:
+            '${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>'
+          committer:
+            '${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>'
+          body: |
+            This PR prepares **v${{ inputs.version }}**.
+
+            Checks applied:
+            - Valid SemVer (no leading `v`)
+            - Ensured tag `v${{ inputs.version }}` and branch `release/v${{ inputs.version }}` do not already exist
+            - Enforced monotonic version (must be greater than current)
+            - Bumped `package.json` (no tag) and verified it matches input
+
+            Merge this PR to proceed with tagging & GitHub Release.
+          labels: release
+          assignees: ${{ github.actor }}
