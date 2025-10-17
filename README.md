@@ -9,13 +9,21 @@ across our projects.
 
 ## How to use
 
-install using npm
+1. Install the config:
 
-```sh
-npm i github:antero-software/eslint-config --save-dev
-```
+   ```sh
+   npm install --save-dev @antero-software/eslint-config
+   ```
 
-2. Create `.eslintrc.js` with the following body:
+2. Install all peer dependencies (run again whenever the config version changes):
+
+   ```sh
+   npx install-peerdeps --dev @antero-software/eslint-config
+   ```
+
+   If you have this repository cloned, you can run `npm run install-peers` to execute the same command.
+
+3. Create `.eslintrc.js` with the following body:
 
 ```
 module.exports = {
@@ -23,7 +31,7 @@ module.exports = {
 };
 ```
 
-3. lint project using eslint `npx eslint ./src/`
+4. lint project using eslint `npx eslint ./src/`
 
 ## Releasing
 
