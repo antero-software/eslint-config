@@ -24,3 +24,7 @@ module.exports = {
 ```
 
 3. lint project using eslint `npx eslint ./src/`
+
+## Releasing
+
+See [`RELEASING_VERSIONS.md`](RELEASING_VERSIONS.md) for the full release checklist using GitHub Actions.
