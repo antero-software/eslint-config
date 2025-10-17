@@ -5,7 +5,10 @@
   "main": ".eslintrc.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "install-peers": "npx install-peerdeps --dev @antero-software/eslint-config"
+    "install-peers": "node ./bin/install-peers.js"
+  },
+  "bin": {
+    "antero-eslint-install": "bin/install-peers.js"
   },
   "repository": {
     "type": "git",
@@ -22,8 +25,8 @@
   "homepage": "https://github.com/antero-software/eslint-config#readme",
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.5.0",
-    "@typescript-eslint/eslint-plugin": "8.46.1",
-    "@typescript-eslint/parser": "8.46.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^10.1.8",

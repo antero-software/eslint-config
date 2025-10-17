@@ -18,10 +18,10 @@ across our projects.
 2. Install all peer dependencies (run again whenever the config version changes):
 
    ```sh
-   npx install-peerdeps --dev @antero-software/eslint-config
+   npx antero-eslint-install
    ```
 
-   If you have this repository cloned, you can run `npm run install-peers` to execute the same command.
+   When working inside this repository, you can run `npm run install-peers` to do the same locally.
 
 3. Create `.eslintrc.js` with the following body:
 
