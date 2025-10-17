@@ -12,7 +12,7 @@ across our projects.
 1. Install the config:
 
    ```sh
-   npm install --save-dev @antero-software/eslint-config
+   npm install --save-dev @antero-software/linting-config
    ```
 
 2. Install all peer dependencies (run again whenever the config version changes):
@@ -27,11 +27,21 @@ across our projects.
 
 ```
 module.exports = {
-  extends: ["@antero-software/eslint-config"],
+  extends: ["@antero-software/linting-config"],
 };
 ```
 
 4. lint project using eslint `npx eslint ./src/`
+
+## Prettier
+
+To share the Prettier configuration, replace any existing `.prettierrc` with `.prettierrc.js` containing:
+
+```js
+module.exports = require("@antero-software/eslint-config/prettier");
+```
+
+You can extend or override rules by exporting an object that merges in this base config.
 
 ## Releasing
 

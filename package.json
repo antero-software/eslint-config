@@ -1,8 +1,12 @@
 {
-  "name": "@antero-software/eslint-config",
+  "name": "@antero-software/linting-config",
   "version": "1.0.3",
   "description": "eslint config for antero projects.",
   "main": ".eslintrc.js",
+  "exports": {
+    ".": "./.eslintrc.js",
+    "./prettier": "./prettier.config.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "install-peers": "node ./bin/install-peers.js"
@@ -12,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/antero-software/eslint-config.git"
+    "url": "git+https://github.com/antero-software/linting-config.git"
   },
   "keywords": [
     "eslint"
@@ -20,9 +24,9 @@
   "author": "haxxxton",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/antero-software/eslint-config/issues"
+    "url": "https://github.com/antero-software/linting-config/issues"
   },
-  "homepage": "https://github.com/antero-software/eslint-config#readme",
+  "homepage": "https://github.com/antero-software/linting-config#readme",
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.5.0",
     "@typescript-eslint/eslint-plugin": "^8.46.1",

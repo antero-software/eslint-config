@@ -1,0 +1,9 @@
+module.exports = {
+  useTabs: false,
+  trailingComma: "all",
+  singleQuote: true,
+  arrowParens: "always",
+  proseWrap: "always",
+  jsxBracketSameLine: false,
+  bracketSpacing: true,
+};
