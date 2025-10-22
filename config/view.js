@@ -18,6 +18,7 @@ module.exports = {
         reservedFirst: true,
       },
     ],
+    'react/jsx-no-useless-fragment': ['error', { allowExpressions: true }],
 
     // Anoying rules that slow dev
     'react/no-unused-prop-types': 'off',

@@ -27,7 +27,7 @@ across our projects.
 
 ```
 module.exports = {
-  extends: ["@antero-software/linting-config"],
+  extends: [require.resolve('@antero-software/linting-config')],
 };
 ```
 
